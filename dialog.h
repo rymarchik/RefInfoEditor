@@ -24,6 +24,8 @@ public:
     void setAddDialComboBox3Values(QStringList);
     void setEditDialComboBox1Values(QStringList);
     void setEditDialComboBox2Values(QStringList);
+    void setEditDialComboBox1Values(QMap<QString,QString>);
+    void setEditDialComboBox2Values(QMap<QString,QString>);
     void setEditDialComboBox3Values(QMap<QString,QString>);
 
     void setMainComboBoxCurrentIndex(int);
@@ -31,10 +33,13 @@ public:
     void setSecondComboBoxCurrentText(QString);
     void setThirdComboBoxCurrentText(QString);
 
-    int getMainComboBoxCurrentIndex();
+    int getCurrentMainComboBoxIndex();
     QString getCurrentMainComboBoxText();
     QString getCurrentSecondComboBoxText();
     QString getCurrentThirdComboBoxText();
+    QString getCurrentMainComboBoxData();
+    QString getCurrentSecondComboBoxData();
+    QString getCurrentThirdComboBoxData();
     QString getCurrentFieldText(int);
 
     int getCurrentAddDialCB1Index();
@@ -76,7 +81,9 @@ private:
     QString virtualKeyboard = "explorer.exe C:\\Windows\\System32\\osk.exe";
 
 signals:
-    void fillingFinished(int);
+    void fillingFinishedComboBox1(int);
+    void fillingFinishedComboBox2(int);
+    void fillingFinishedComboBox3(int);
 
 private slots:
 

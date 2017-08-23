@@ -173,7 +173,7 @@ void Editor::slotShowDirectoryInfo(QListWidgetItem* dirItem) {
         while(query.next()) {
             lowerTable->setItem(i, 0, new QTableWidgetItem(query.value(rec.indexOf("termname")).toString()));
             lowerTable->setItem(i, 1, new QTableWidgetItem
-                               (tr("%1").arg(query.value(rec.indexOf("value")).toDouble())));
+                               (tr("%1").arg(query.value(rec.indexOf("damage_degree_value")).toDouble())));
             i++;
         }
 
@@ -338,7 +338,6 @@ void Editor::slotShowLowerFireTable() {
 }
 
 void Editor::slotEditDialChangeComboBox1(int n) {
-    qDebug() << "n1: " << n;
     if (n != -1) {
         if (directoryList->currentItem() == directoryList->item(2)) {
 
@@ -346,32 +345,25 @@ void Editor::slotEditDialChangeComboBox1(int n) {
                 dialog->setMainComboBoxCurrentText(lowerTable->item(lowerTable->currentRow(), 0)->text());
                 return;
             }
-            qDebug() << "1!";
+            dialog->setEditDialComboBox2Values(getDamageDegrees());
 
+/*  ALSO WORKING OPTION -----------------------------------------------------------------------------------
             QStringList list;
-            for (int i = 0; i < lowerTable->rowCount(); i++) {
-                if (lowerTable->item(i, 0)->text() == dialog->getCurrentMainComboBoxText())
-                    if (!list.contains(lowerTable->item(i, 1)->text()))
-                        list.append(lowerTable->item(i, 1)->text());
+            QSqlQuery query;
+            QString selectPattern = "SELECT DISTINCT t.termname FROM reference_data.terms t JOIN "
+                                    "reference_data.norms_damage_target dr ON "
+                                    "t.termhierarchy = dr.damage_degree_tid WHERE dr.damage_object_tid IN "
+                                    "(SELECT dr.damage_object_tid FROM reference_data.norms_damage_target dr "
+                                    "JOIN reference_data.terms t ON dr.damage_object_tid = t.termhierarchy WHERE "
+                                    "t.termname = '%1')";
+            QString selectQuery = selectPattern.arg(dialog->getCurrentMainComboBoxText());
+            query.exec(selectQuery);
+            while(query.next()) {
+                list.append(query.value(0).toString());
             }
-            dialog->setEditDialComboBox2Values(list);
-
-//  ALSO WORKING OPTION -----------------------------------------------------------------------------------
-//            QStringList list;
-//            QSqlQuery query;
-//            QString selectPattern = "SELECT DISTINCT t.termname FROM reference_data.terms t JOIN "
-//                                    "reference_data.norms_damage_target dr ON "
-//                                    "t.termhierarchy = dr.damage_degree_tid WHERE dr.damage_object_tid IN "
-//                                    "(SELECT dr.damage_object_tid FROM reference_data.norms_damage_target dr "
-//                                    "JOIN reference_data.terms t ON dr.damage_object_tid = t.termhierarchy WHERE "
-//                                    "t.termname = '%1')";
-//            QString selectQuery = selectPattern.arg(dialog->getCurrentMainComboBoxText());
-//            query.exec(selectQuery);
-//            while(query.next()) {
-//                list.append(query.value(0).toString());
-//            }
-//            qDebug() << list;
-//            dialog->setSecondComboBoxValues(list);
+            qDebug() << list;
+            dialog->setSecondComboBoxValues(list);
+*/
         }
         else if (directoryList->currentItem() == directoryList->item(4)) {
             if (upperTable->hasFocus() || lowerTable->hasFocus()) {
@@ -440,7 +432,6 @@ void Editor::slotEditDialChangeComboBox1(int n) {
 }
 
 void Editor::slotEditDialChangeComboBox2(int n) {
-    qDebug() << "n2: " << n;
     if (n != -1) {
         if (directoryList->currentItem() == directoryList->item(2)) {
 
@@ -448,7 +439,6 @@ void Editor::slotEditDialChangeComboBox2(int n) {
                 dialog->setSecondComboBoxCurrentText(lowerTable->item(lowerTable->currentRow(), 1)->text());
                 return;
             }
-            qDebug() << "2!";
             dialog->setEditDialComboBox3Values(getRocketTypes());
         }
         else if (directoryList->currentItem() == directoryList->item(4)) {
@@ -519,14 +509,11 @@ void Editor::slotEditDialChangeComboBox2(int n) {
 }
 
 void Editor::slotEditDialChangeComboBox3(int n) {
-    qDebug() << "n3: " << n;
     if (n != -1) {
-
         if (lowerTable->hasFocus() && lowerTable->item(lowerTable->currentRow(), 2)->text() != dialog->getCurrentThirdComboBoxText()) {
             dialog->setThirdComboBoxCurrentText(lowerTable->item(lowerTable->currentRow(), 2)->text());
             return;
         }
-        qDebug() << "3!";
 
         QStringList list;
         for (int i = 0; i < lowerTable->rowCount(); i++) {
@@ -539,7 +526,6 @@ void Editor::slotEditDialChangeComboBox3(int n) {
                        list.append("");
                    }
         }
-//        qDebug() << list;
         dialog->fillFieldList(list);
         dialog->placeFieldList(list.size());
 
@@ -828,7 +814,19 @@ void Editor::slotEdit() {
     }
     else {
         dialog->setLabelNames(getLowerTableHeaderNames());
-        dialog->setEditDialComboBox1Values(getToBeEditedColumnValues());
+
+        if (directoryList->currentItem() == directoryList->item(0)) {
+            dialog->setEditDialComboBox1Values(getRocketTypes());
+        }
+        else if (directoryList->currentItem() == directoryList->item(1)) {
+            dialog->setEditDialComboBox1Values(getDamageDegrees());
+        }
+        else if (directoryList->currentItem() == directoryList->item(2)) {
+            dialog->setEditDialComboBox1Values(getHitTargets());
+        }
+        else if (directoryList->currentItem() == directoryList->item(3)) {
+            dialog->setEditDialComboBox1Values(getSquareHitTargets());
+        }
     }
 
     if (dialog->exec() == QDialog::Accepted) {
@@ -837,46 +835,47 @@ void Editor::slotEdit() {
         QString updateQuery;
 
         if (directoryList->currentItem() == directoryList->item(0)) {
-            updatePattern = "UPDATE reference_data.bch_param w SET damage_radius = %1, "
-                            "range_sko = %2, lateral_sko = %3 FROM reference_data.terms t "
-                            "WHERE t.termhierarchy = w.type_tid AND t.termname = '%4'";
+            updatePattern = "UPDATE reference_data.bch_param "
+                            "SET damage_radius = %1, range_sko = %2, lateral_sko = %3 "
+                            "WHERE type_tid = '%4'";
             updateQuery = updatePattern.arg(dialog->getCurrentFieldText(0)).arg(dialog->getCurrentFieldText(1))
-                    .arg(dialog->getCurrentFieldText(2)).arg(dialog->getCurrentMainComboBoxText());
+                    .arg(dialog->getCurrentFieldText(2)).arg(dialog->getCurrentMainComboBoxData());
         }
 
         else if (directoryList->currentItem() == directoryList->item(1)) {
-            updatePattern = "UPDATE reference_data.damage_degree dd SET value = %1 FROM "
-                            "reference_data.terms t WHERE t.termhierarchy = dd.damage_degree_tid "
-                            "AND t.termname = '%2'";
+            updatePattern = "UPDATE reference_data.damage_degree "
+                            "SET damage_degree_value = %1 "
+                            "WHERE damage_degree_tid = '%2'";
             updateQuery = updatePattern.arg(dialog->getCurrentFieldText(0))
-                    .arg(dialog->getCurrentMainComboBoxText());
+                    .arg(dialog->getCurrentMainComboBoxData());
         }
 
         else if (directoryList->currentItem() == directoryList->item(2)) {
-            updatePattern = "UPDATE reference_data.norms_damage_target ts SET amount = %1 "
-                            "FROM reference_data.terms t1, reference_data.terms t2, "
-                            "reference_data.terms t3 WHERE t1.termhierarchy = ts.damage_object_tid AND "
-                            "t1.termname = '%2' AND t2.termhierarchy = ts.damage_degree_tid "
-                            "AND t2.termname = '%3' AND t3.termhierarchy = ts.type_tid AND "
-                            "t3.termname = '%4'";
-            updateQuery = updatePattern.arg(dialog->getCurrentFieldText(0))
-                    .arg(dialog->getCurrentMainComboBoxText()).arg(dialog->getCurrentSecondComboBoxText())
-                    .arg(dialog->getCurrentThirdComboBoxText());
+            updatePattern = "UPDATE reference_data.norms_damage_target "
+                            "SET type_tid = '%1', amount = %2 "
+                            "WHERE damage_object_tid = '%3' "
+                            "     AND damage_degree_tid = '%4'";
+            updateQuery = updatePattern.arg(dialog->getCurrentThirdComboBoxData())
+                    .arg(dialog->getCurrentFieldText(0)).arg(dialog->getCurrentMainComboBoxData())
+                    .arg(dialog->getCurrentSecondComboBoxData());
         }
 
         else if (directoryList->currentItem() == directoryList->item(3)) {
-            updatePattern = "UPDATE reference_data.target_sizes ts SET front = %1, depth = %2 "
-                            "FROM reference_data.terms t WHERE t.termhierarchy = ts.target_name "
-                            "AND t.termname = '%3'";
+            updatePattern = "UPDATE reference_data.target_sizes "
+                            "SET front = %1, depth = %2 "
+                            "WHERE target_name = '%3'";
             updateQuery = updatePattern.arg(dialog->getCurrentFieldText(0))
-                    .arg(dialog->getCurrentFieldText(1)).arg(dialog->getCurrentMainComboBoxText());
+                    .arg(dialog->getCurrentFieldText(1)).arg(dialog->getCurrentMainComboBoxData());
         }
 
         else if (directoryList->currentItem() == directoryList->item(4)) {
-            updatePattern = "UPDATE reference_data.shooting_table f SET start_angle = %1, "
-                            "flight_time = %2, max_height = %3, norm_engine_fall_place = %4, "
-                            "min_engine_fall_place = %5, max_engine_fall_place = %6, min_depart_time = %7, "
-                            "max_depart_time = %8 WHERE bm_height = %9 AND target_distance = %10";
+            updatePattern = "UPDATE reference_data.shooting_table "
+                            "SET start_angle = %1, flight_time = %2, max_height = %3, "
+                            "   norm_engine_fall_place = %4, min_engine_fall_place = %5, "
+                            "   max_engine_fall_place = %6, min_depart_time = %7, "
+                            "   max_depart_time = %8 "
+                            "WHERE bm_height = %9 "
+                            "   AND target_distance = %10";
             updateQuery = updatePattern.arg(dialog->getCurrentFieldText(0)).arg(dialog->getCurrentFieldText(1))
                     .arg(dialog->getCurrentFieldText(2)).arg(dialog->getCurrentFieldText(3))
                     .arg(dialog->getCurrentFieldText(4)).arg(dialog->getCurrentFieldText(5))
@@ -891,7 +890,7 @@ void Editor::slotEdit() {
         else {
             QMessageBox::information(this, "Уведомление", "Обновление прошло успешно!");
             slotShowDirectoryInfo(directoryList->currentItem());
-            upperTable->setCurrentItem(upperTable->item(dialog->getMainComboBoxCurrentIndex(), 0));
+            upperTable->setCurrentItem(upperTable->item(dialog->getCurrentMainComboBoxIndex(), 0));
         }
     }
     dialog->closeKeyboard();
@@ -1063,6 +1062,24 @@ QMap<QString,QString> Editor::getHitTargets() {
     QString selectQuery = "SELECT termhierarchy, termname "
                           "FROM reference_data.terms "
                           "WHERE termhierarchy ~ '90.*' "
+                          "     AND nlevel(termhierarchy) = 3";
+    if (!query.exec(selectQuery)) {
+        qDebug() << "Unable to make select operation!" << query.lastError();
+    }
+
+    QMap<QString,QString> map;
+    while (query.next()) {
+        map.insert(query.value(0).toString(), query.value(1).toString());
+    }
+    qDebug() << map;
+    return map;
+}
+
+QMap<QString,QString> Editor::getSquareHitTargets() {
+    QSqlQuery query;
+    QString selectQuery = "SELECT termhierarchy, termname "
+                          "FROM reference_data.terms "
+                          "WHERE termhierarchy ~ '90.20.*' "
                           "     AND nlevel(termhierarchy) = 3";
     if (!query.exec(selectQuery)) {
         qDebug() << "Unable to make select operation!" << query.lastError();

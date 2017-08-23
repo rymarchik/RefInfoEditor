@@ -48,7 +48,9 @@ Dialog::Dialog(QWidget *parent) :
     connect(editDialComboBox1, SIGNAL(currentIndexChanged(int)), this->parent(), SLOT(slotEditDialChangeComboBox1(int)));
     connect(editDialComboBox2, SIGNAL(currentIndexChanged(int)), this->parent(), SLOT(slotEditDialChangeComboBox2(int)));
     connect(editDialComboBox3, SIGNAL(currentIndexChanged(int)), this->parent(), SLOT(slotEditDialChangeComboBox3(int)));
-    connect(this, SIGNAL(fillingFinished(int)), this->parent(), SLOT(slotEditDialChangeComboBox3(int)));
+    connect(this, SIGNAL(fillingFinishedComboBox1(int)), this->parent(), SLOT(slotEditDialChangeComboBox1(int)));
+    connect(this, SIGNAL(fillingFinishedComboBox2(int)), this->parent(), SLOT(slotEditDialChangeComboBox2(int)));
+    connect(this, SIGNAL(fillingFinishedComboBox3(int)), this->parent(), SLOT(slotEditDialChangeComboBox3(int)));
 }
 
 void Dialog::clearLayout(QLayout* layout) {
@@ -92,7 +94,6 @@ void Dialog::setLabelNames(QStringList list) {
 void Dialog::setAddDialComboBox1Values(QStringList list) {
     addDialComboBox1->setHidden(false);
     addDialComboBox1->clear();
-//    addDialComboBox1->setEnabled(true);
 
     addDialComboBox1->addItems(list);
     fieldLayout->insertWidget(0, addDialComboBox1);
@@ -165,6 +166,46 @@ void Dialog::setEditDialComboBox2Values(QStringList list) {
     }
 }
 
+void Dialog::setEditDialComboBox1Values(QMap<QString,QString> map) {
+    addDialComboBox1->setHidden(true);
+    addDialComboBox2->setHidden(true);
+    addDialComboBox3->setHidden(true);
+    editDialComboBox1->setHidden(false);
+    editDialComboBox2->setHidden(true);
+    editDialComboBox3->setHidden(true);
+    editDialComboBox1->clear();
+    editDialComboBox1->setEnabled(false);
+
+    for (int i = 0; i < map.size(); i++) {
+        editDialComboBox1->addItem(map.values().at(i), map.keys().at(i));
+    }
+    emit fillingFinishedComboBox1(0);
+
+    fieldLayout->insertWidget(0, editDialComboBox1);
+}
+
+void Dialog::setEditDialComboBox2Values(QMap<QString,QString> map) {
+    editDialComboBox2->setHidden(false);
+    editDialComboBox2->clear();
+    editDialComboBox2->setEnabled(false);
+
+    for (int i = 0; i < map.size(); i++) {
+        editDialComboBox2->addItem(map.values().at(i), map.keys().at(i));
+    }
+    emit fillingFinishedComboBox2(0);
+
+    int comboBoxOverseer = 0;
+    for (int i = 0; i < fieldLayout->count(); i++) {
+        if (fieldLayout->itemAt(i)->widget()->objectName() == "editSecondCB") {
+            comboBoxOverseer++;
+            return;
+        }
+    }
+    if (comboBoxOverseer == 0) {
+        fieldLayout->insertWidget(0, editDialComboBox2);
+    }
+}
+
 void Dialog::setEditDialComboBox3Values(QMap<QString, QString> map) {
     editDialComboBox3->setHidden(false);
     editDialComboBox3->clear();
@@ -172,8 +213,7 @@ void Dialog::setEditDialComboBox3Values(QMap<QString, QString> map) {
     for (int i = 0; i < map.size(); i++) {
         editDialComboBox3->addItem(map.values().at(i), map.keys().at(i));
     }
-    emit fillingFinished(0);
-//    editDialComboBox3->addItems(map.values());
+    emit fillingFinishedComboBox3(0);
 
     int comboBoxOverseer = 0;
     for (int i = 0; i < fieldLayout->count(); i++) {
@@ -236,7 +276,7 @@ void Dialog::setThirdComboBoxCurrentText(QString str) {
 }
 
 
-int Dialog::getMainComboBoxCurrentIndex() {
+int Dialog::getCurrentMainComboBoxIndex() {
     return editDialComboBox1->currentIndex();
 }
 
@@ -250,6 +290,18 @@ QString Dialog::getCurrentSecondComboBoxText() {
 
 QString Dialog::getCurrentThirdComboBoxText() {
     return editDialComboBox3->currentText();
+}
+
+QString Dialog::getCurrentMainComboBoxData() {
+    return editDialComboBox1->currentData().toString();
+}
+
+QString Dialog::getCurrentSecondComboBoxData() {
+    return editDialComboBox2->currentData().toString();
+}
+
+QString Dialog::getCurrentThirdComboBoxData() {
+    return editDialComboBox3->currentData().toString();
 }
 
 

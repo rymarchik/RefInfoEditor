@@ -22,6 +22,7 @@ public:
     QStringList getUpperTableColumnValues();
 
     QMap<QString,QString> getHitTargets();
+    QMap<QString,QString> getSquareHitTargets();
     QMap<QString,QString> getDamageDegrees();
     QMap<QString,QString> getRocketTypes();
 
