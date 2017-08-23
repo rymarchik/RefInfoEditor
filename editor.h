@@ -17,7 +17,7 @@ public:
     QStringList getLowerTableHeaderNames();
     QStringList getAllTableHeaderNames();
 
-    QStringList getToBeAddedColumnValues();
+    QMap<QString,QString> getToBeAddedColumnValues();
     QStringList getToBeEditedColumnValues();
     QStringList getUpperTableColumnValues();
 

@@ -517,14 +517,16 @@ void Editor::slotEditDialChangeComboBox3(int n) {
 
         QStringList list;
         for (int i = 0; i < lowerTable->rowCount(); i++) {
-            if (lowerTable->item(i, 0)->text() == dialog->getCurrentMainComboBoxText())
-               if (lowerTable->item(i, 1)->text() == dialog->getCurrentSecondComboBoxText())
-                   if (lowerTable->item(i, 2)->text() == dialog->getCurrentThirdComboBoxText()) {
-                       list.append(lowerTable->item(i, 3)->text());
-                   }
-                   else {
-                       list.append("");
-                   }
+            if (lowerTable->item(i, 0)->text() == dialog->getCurrentMainComboBoxText()) {
+                if (lowerTable->item(i, 1)->text() == dialog->getCurrentSecondComboBoxText()) {
+                    if (lowerTable->item(i, 2)->text() == dialog->getCurrentThirdComboBoxText()) {
+                        list.append(lowerTable->item(i, 3)->text());
+                    }
+                    else {
+                        list.append("");
+                    }
+                }
+            }
         }
         dialog->fillFieldList(list);
         dialog->placeFieldList(list.size());
@@ -538,16 +540,7 @@ void Editor::slotEditDialChangeComboBox3(int n) {
 void Editor::slotAddDialChangeComboBox1(int n) {
     if (n != -1) {
         if (directoryList->currentItem() == directoryList->item(2)) {
-            QSqlQuery query;
-            QString selectPattern = "SELECT termname FROM reference_data.terms WHERE termhierarchy ~ '95.10.*' AND "
-                                    "termhierarchy != '95.10'";
-            query.exec(selectPattern);
-
-            QStringList list;
-            while (query.next()) {
-                list.append(query.value(0).toString());
-            }
-            dialog->setAddDialComboBox2Values(list);
+            slotAddDialChangeComboBox2(0);
         }
         else if (directoryList->currentItem() == directoryList->item(4)) {
             if (upperTable->hasFocus() || lowerTable->hasFocus()) {
@@ -563,26 +556,25 @@ void Editor::slotAddDialChangeComboBox1(int n) {
 void Editor::slotAddDialChangeComboBox2(int n) {
     if (n != -1) {
         QSqlQuery query;
-        QString selectCurrent = "SELECT t1.termhierarchy, t2.termhierarchy FROM reference_data.terms t1, reference_data.terms "
-                                "t2 WHERE t1.termname = '%1' AND t2.termname = '%2'";
-        QString selectCurrentQuery = selectCurrent.arg(dialog->getCurrentAddDialCB1Text()).arg(dialog->getCurrentAddDialCB2Text());
-        query.exec(selectCurrentQuery);
-        query.next();
-        QString currentObject = query.value(0).toString();
-        QString currentDegree = query.value(1).toString();
-
-        QString selectPattern = "SELECT termname FROM reference_data.terms WHERE termhierarchy ~ '51.50.*' AND "
-                                "termhierarchy != '51.50' AND termhierarchy NOT IN (SELECT type_tid FROM "
-                                "reference_data.norms_damage_target WHERE damage_object_tid = '%1' AND damage_degree_tid = '%2')";
-        QString selectQuery = selectPattern.arg(currentObject).arg(currentDegree);
+        QString selectPattern = "SELECT termhierarchy, termname "
+                                "FROM reference_data.terms "
+                                "WHERE termhierarchy ~ '51.50.*' "
+                                "   AND nlevel(termhierarchy) = 3 "
+                                "   AND termhierarchy != '51.50.30' "
+                                "   AND termhierarchy NOT IN "
+                                "       (SELECT type_tid "
+                                "           FROM reference_data.norms_damage_target "
+                                "           WHERE damage_object_tid = '%1' "
+                                "               AND damage_degree_tid = '%2')";
+        QString selectQuery = selectPattern.arg(dialog->getCurrentAddDialCB1Data())
+                                           .arg(dialog->getCurrentAddDialCB2Data());
         query.exec(selectQuery);
 
-        QStringList list;
+        QMap<QString,QString> map;
         while (query.next()) {
-            list.append(query.value(0).toString());
+            map.insert(query.value(0).toString(), query.value(1).toString());
         }
-        qDebug() << list;
-        dialog->setAddDialComboBox3Values(list);
+        dialog->setAddDialComboBox3Values(map);
     }
 }
 
@@ -598,7 +590,8 @@ void Editor::slotAdd() {
     if (directoryList->currentItem() == directoryList->item(2)) {
         dialog->setLabelNames(getLowerTableHeaderNames());
         dialog->setEmptyLineEdits(1);
-        dialog->setAddDialComboBox1Values(getToBeAddedColumnValues());
+        dialog->setAddDialComboBox2Values(getDamageDegrees());//важен именно такой порядок заполнения!
+        dialog->setAddDialComboBox1Values(getHitTargets());
 
         intValidator = new QIntValidator(1, 99);
         dialog->setLineEditValidator(0, intValidator);
@@ -705,22 +698,13 @@ void Editor::slotAdd() {
     if (dialog->exec() == QDialog::Accepted) {
         if (directoryList->currentItem() == directoryList->item(2)) {
             QSqlQuery query;
-            QString selectCurrent = "SELECT t1.termhierarchy, t2.termhierarchy, t3.termhierarchy FROM "
-                                    "reference_data.terms t1, reference_data.terms t2, reference_data.terms t3 "
-                                    "WHERE t1.termname = '%1' AND t2.termname = '%2' AND t3.termname = '%3'";
-            QString selectCurrentQuery = selectCurrent.arg(dialog->getCurrentAddDialCB1Text())
-                    .arg(dialog->getCurrentAddDialCB2Text()).arg(dialog->getCurrentAddDialCB3Text());
-
-            query.exec(selectCurrentQuery);
-            query.next();
-            QString currentObject = query.value(0).toString();
-            QString currentDegree = query.value(1).toString();
-            QString currentRocket = query.value(2).toString();
-
-            QString insertPattern = "INSERT INTO reference_data.norms_damage_target (damage_object_tid, damage_degree_tid, "
-                                    "type_tid, amount) VALUES ('%1', '%2', '%3', %4)";
-            QString insertQuery = insertPattern.arg(currentObject).arg(currentDegree)
-                    .arg(currentRocket).arg(dialog->getCurrentFieldText(0));
+            QString insertPattern = "INSERT INTO reference_data.norms_damage_target (damage_object_tid, "
+                                    "   damage_degree_tid, type_tid, amount) "
+                                    "VALUES ('%1', '%2', '%3', %4)";
+            QString insertQuery = insertPattern.arg(dialog->getCurrentAddDialCB1Data())
+                                               .arg(dialog->getCurrentAddDialCB2Data())
+                                               .arg(dialog->getCurrentAddDialCB1Data())
+                                               .arg(dialog->getCurrentFieldText(0));
 
             if (!query.exec(insertQuery)) {
                 qDebug() << "Unable to make insert operation\n" << query.lastError();
@@ -734,9 +718,10 @@ void Editor::slotAdd() {
         else if (directoryList->currentItem() == directoryList->item(4)) {
             QSqlQuery query;
             QString insertPattern = "INSERT INTO reference_data.shooting_table (bm_height, target_distance, "
-                                    "start_angle, flight_time, max_height, norm_engine_fall_place, "
-                                    "min_engine_fall_place, max_engine_fall_place, min_depart_time, "
-                                    "max_depart_time) VALUES (%1, %2, %3, %4, %5, %6, %7, %8, %9, %10)";
+                                    "   start_angle, flight_time, max_height, norm_engine_fall_place, "
+                                    "   min_engine_fall_place, max_engine_fall_place, min_depart_time, "
+                                    "   max_depart_time) "
+                                    "VALUES (%1, %2, %3, %4, %5, %6, %7, %8, %9, %10)";
             QString insertQuery;
             if (upperTable->hasFocus()) {
                 insertQuery = insertPattern.arg(dialog->getCurrentAddDialCB1Text()).arg(dialog->getCurrentFieldText(0))
@@ -765,29 +750,26 @@ void Editor::slotAdd() {
         }
         else {
             QSqlQuery query;
-
             QString insertPattern;
             QString insertQuery;
 
             if (directoryList->currentItem() == directoryList->item(0)) {
-                insertPattern = "INSERT INTO reference_data.bch_param "
-                                "(type_tid, damage_radius, range_sko, lateral_sko) "
-                                "VALUES ((SELECT termhierarchy FROM reference_data.terms WHERE "
-                                "termname = '%1'), %2, %3, %4)";
-                insertQuery = insertPattern.arg(dialog->getCurrentAddDialCB1Text()).arg(dialog->getCurrentFieldText(0))
+                insertPattern = "INSERT INTO reference_data.bch_param (type_tid, damage_radius, "
+                                "   range_sko, lateral_sko) "
+                                "VALUES ('%1', %2, %3, %4)";
+                insertQuery = insertPattern.arg(dialog->getCurrentAddDialCB1Data()).arg(dialog->getCurrentFieldText(0))
                         .arg(dialog->getCurrentFieldText(1)).arg(dialog->getCurrentFieldText(2));
             }
             else if (directoryList->currentItem() == directoryList->item(1)) {
-                insertPattern = "INSERT INTO reference_data.damage_degree (damage_degree_tid, value) "
-                                "VALUES ((SELECT termhierarchy FROM reference_data.terms WHERE "
-                                "termname = '%1'), %2)";
-                insertQuery = insertPattern.arg(dialog->getCurrentAddDialCB1Text()).arg(dialog->getCurrentFieldText(0));
+                insertPattern = "INSERT INTO reference_data.damage_degree (damage_degree_tid, "
+                                "   damage_degree_value) "
+                                "VALUES ('%1', %2)";
+                insertQuery = insertPattern.arg(dialog->getCurrentAddDialCB1Data()).arg(dialog->getCurrentFieldText(0));
             }
             else if (directoryList->currentItem() == directoryList->item(3)) {
                 insertPattern = "INSERT INTO reference_data.target_sizes (target_name, front, depth) "
-                                "VALUES ((SELECT termhierarchy FROM reference_data.terms WHERE "
-                                "termname = '%1'), %2, %3)";
-                insertQuery = insertPattern.arg(dialog->getCurrentAddDialCB1Text()).arg(dialog->getCurrentFieldText(0))
+                                "VALUES ('%1', %2, %3)";
+                insertQuery = insertPattern.arg(dialog->getCurrentAddDialCB1Data()).arg(dialog->getCurrentFieldText(0))
                         .arg(dialog->getCurrentFieldText(1));
             }
 
@@ -1009,34 +991,39 @@ QStringList Editor::getAllTableHeaderNames() {
     return list;
 }
 
-QStringList Editor::getToBeAddedColumnValues() {
+QMap<QString,QString> Editor::getToBeAddedColumnValues() {
     QSqlQuery query;
     QString selectPattern;
 
     if (directoryList->currentItem() == directoryList->item(0)) {
-        selectPattern = "SELECT termname FROM reference_data.terms WHERE termhierarchy ~ '51.50.*' AND "
-                        "termhierarchy NOT IN (SELECT type_tid FROM reference_data.bch_param)";
+        selectPattern = "SELECT termhierarchy, termname "
+                        "FROM reference_data.terms "
+                        "WHERE termhierarchy ~ '51.50.*' "
+                        "   AND nlevel(termhierarchy) = 3 "
+                        "   AND termhierarchy != '51.50.30' "
+                        "   AND termhierarchy NOT IN (SELECT type_tid FROM reference_data.bch_param)";
     }
     else if (directoryList->currentItem() == directoryList->item(1)) {
-        selectPattern = "SELECT termname FROM reference_data.terms WHERE termhierarchy ~ '95.10.*' AND "
-                        "termhierarchy NOT IN (SELECT damage_degree_tid FROM reference_data.damage_degree)";
-    }
-    else if (directoryList->currentItem() == directoryList->item(2)) {
-        selectPattern = "SELECT termname FROM reference_data.terms WHERE termhierarchy ~ '90.*' AND "
-                        "termhierarchy != '90.10' AND termhierarchy != '90.20' AND termhierarchy != '90.30'";
+        selectPattern = "SELECT termhierarchy, termname "
+                        "FROM reference_data.terms "
+                        "WHERE termhierarchy ~ '95.10.*' "
+                        "   AND nlevel(termhierarchy) = 3 "
+                        "   AND termhierarchy NOT IN (SELECT damage_degree_tid FROM reference_data.damage_degree)";
     }
     else if (directoryList->currentItem() == directoryList->item(3)) {
-        selectPattern = "SELECT termname FROM reference_data.terms WHERE termhierarchy ~ '90.20.*' AND "
-                        "termhierarchy NOT IN (SELECT target_name FROM reference_data.target_sizes)";
+        selectPattern = "SELECT termhierarchy, termname "
+                        "FROM reference_data.terms "
+                        "WHERE termhierarchy ~ '90.20.*' "
+                        "   AND nlevel(termhierarchy) = 3 "
+                        "   AND termhierarchy NOT IN (SELECT target_name FROM reference_data.target_sizes)";
     }
     query.exec(selectPattern);
-    query.next(); // exclude parent
 
-    QStringList list;
+    QMap<QString,QString> map;
     while (query.next()) {
-        list.append(query.value(0).toString());
+        map.insert(query.value(0).toString(), query.value(1).toString());
     }
-    return list;
+    return map;
 }
 
 QStringList Editor::getToBeEditedColumnValues() {
@@ -1071,7 +1058,6 @@ QMap<QString,QString> Editor::getHitTargets() {
     while (query.next()) {
         map.insert(query.value(0).toString(), query.value(1).toString());
     }
-    qDebug() << map;
     return map;
 }
 
@@ -1089,7 +1075,6 @@ QMap<QString,QString> Editor::getSquareHitTargets() {
     while (query.next()) {
         map.insert(query.value(0).toString(), query.value(1).toString());
     }
-    qDebug() << map;
     return map;
 }
 
@@ -1107,7 +1092,6 @@ QMap<QString,QString> Editor::getDamageDegrees() {
     while (query.next()) {
         map.insert(query.value(0).toString(), query.value(1).toString());
     }
-    qDebug() << map;
     return map;
 }
 
@@ -1126,6 +1110,5 @@ QMap<QString,QString> Editor::getRocketTypes() {
     while (query.next()) {
         map.insert(query.value(0).toString(), query.value(1).toString());
     }
-    qDebug() << map;
     return map;
 }
