@@ -21,6 +21,7 @@ public:
     QStringList getToBeEditedColumnValues();
     QStringList getUpperTableColumnValues();
 
+    QMap<QString,QString> getNotAddedHitTargets();
     QMap<QString,QString> getHitTargets();
     QMap<QString,QString> getSquareHitTargets();
     QMap<QString,QString> getDamageDegrees();

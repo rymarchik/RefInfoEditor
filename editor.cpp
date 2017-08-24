@@ -540,7 +540,23 @@ void Editor::slotEditDialChangeComboBox3(int n) {
 void Editor::slotAddDialChangeComboBox1(int n) {
     if (n != -1) {
         if (directoryList->currentItem() == directoryList->item(2)) {
-            slotAddDialChangeComboBox2(0);
+            QSqlQuery query;
+            QString selectPattern = "SELECT termhierarchy, termname "
+                                    "FROM reference_data.terms "
+                                    "WHERE termhierarchy ~ '95.10.*' "
+                                    "   AND nlevel(termhierarchy) = 3 "
+                                    "   AND termhierarchy NOT IN "
+                                    "       (SELECT damage_degree_tid "
+                                    "        FROM reference_data.norms_damage_target "
+                                    "        WHERE damage_object_tid = '%1')";
+            QString selectQuery = selectPattern.arg(dialog->getCurrentAddDialCB1Data());
+            query.exec(selectQuery);
+
+            QMap<QString,QString> map;
+            while (query.next()) {
+                map.insert(query.value(0).toString(), query.value(1).toString());
+            }
+            dialog->setAddDialComboBox2Values(map);
         }
         else if (directoryList->currentItem() == directoryList->item(4)) {
             if (upperTable->hasFocus() || lowerTable->hasFocus()) {
@@ -563,9 +579,9 @@ void Editor::slotAddDialChangeComboBox2(int n) {
                                 "   AND termhierarchy != '51.50.30' "
                                 "   AND termhierarchy NOT IN "
                                 "       (SELECT type_tid "
-                                "           FROM reference_data.norms_damage_target "
-                                "           WHERE damage_object_tid = '%1' "
-                                "               AND damage_degree_tid = '%2')";
+                                "        FROM reference_data.norms_damage_target "
+                                "        WHERE damage_object_tid = '%1' "
+                                "           AND damage_degree_tid = '%2')";
         QString selectQuery = selectPattern.arg(dialog->getCurrentAddDialCB1Data())
                                            .arg(dialog->getCurrentAddDialCB2Data());
         query.exec(selectQuery);
@@ -590,8 +606,7 @@ void Editor::slotAdd() {
     if (directoryList->currentItem() == directoryList->item(2)) {
         dialog->setLabelNames(getLowerTableHeaderNames());
         dialog->setEmptyLineEdits(1);
-        dialog->setAddDialComboBox2Values(getDamageDegrees());//важен именно такой порядок заполнения!
-        dialog->setAddDialComboBox1Values(getHitTargets());
+        dialog->setAddDialComboBox1Values(getNotAddedHitTargets());
 
         intValidator = new QIntValidator(1, 99);
         dialog->setLineEditValidator(0, intValidator);
@@ -897,8 +912,10 @@ void Editor::slotDelete() {
         classifierIds.append(query.value(1).toString());
         classifierIds.append(query.value(2).toString());
 
-        QString deletePattern = "DELETE FROM reference_data.norms_damage_target WHERE damage_object_tid = '%1' "
-                                "AND damage_degree_tid = '%2' AND type_tid = '%3'";
+        QString deletePattern = "DELETE FROM reference_data.norms_damage_target "
+                                "WHERE damage_object_tid = '%1' "
+                                "   AND damage_degree_tid = '%2' "
+                                "   AND type_tid = '%3'";
         QString deleteQuery = deletePattern.arg(classifierIds.at(0)).arg(classifierIds.at(1)).arg(classifierIds.at(2));
 
         if (!query.exec(deleteQuery)) {
@@ -916,12 +933,14 @@ void Editor::slotDelete() {
         QString deleteQuery;
 
         if (upperTable->hasFocus()) {
-            deletePattern = "DELETE FROM reference_data.shooting_table WHERE bm_height = %1";
+            deletePattern = "DELETE FROM reference_data.shooting_table "
+                            "WHERE bm_height = %1";
             deleteQuery = deletePattern.arg(upperTable->item(upperTable->currentRow(), 0)->text());
         }
         else if (lowerTable->hasFocus()) {
-            deletePattern = "DELETE FROM reference_data.shooting_table WHERE bm_height = %1 AND "
-                            "target_distance = %2";
+            deletePattern = "DELETE FROM reference_data.shooting_table "
+                            "WHERE bm_height = %1 "
+                            "   AND target_distance = %2";
             deleteQuery = deletePattern.arg(upperTable->item(upperTable->currentRow(), 0)->text())
                     .arg(lowerTable->item(lowerTable->currentRow(), 0)->text());
         }
@@ -945,7 +964,10 @@ void Editor::slotDelete() {
     else {
         QString classifierName = lowerTable->item(lowerTable->currentRow(), 0)->text();
         QSqlQuery query;
-        QString selectPattern = "SELECT termhierarchy FROM reference_data.terms WHERE termname = '%1'";
+        QString selectPattern = "SELECT termhierarchy "
+                                "FROM reference_data.terms "
+                                "WHERE termname = '%1' "
+                                "   AND termhierarchy ~ '90.20.*'";
         QString selectQuery = selectPattern.arg(classifierName);
         query.exec(selectQuery);
         query.next();
@@ -964,6 +986,7 @@ void Editor::slotDelete() {
         }
 
         QString deleteQuery = deletePattern.arg(classifierId);
+        qDebug() << deleteQuery;
 
         if (!query.exec(deleteQuery)) {
             qDebug() << "Unable to make delete operation\n" << query.lastError();
@@ -1043,6 +1066,33 @@ QStringList Editor::getUpperTableColumnValues() {
     }
     return list;
 }
+
+QMap<QString,QString> Editor::getNotAddedHitTargets() {
+    QSqlQuery query;
+    QString selectQuery = "SELECT termhierarchy, termname "
+                          "FROM reference_data.terms "
+                          "WHERE termhierarchy ~ '90.*' "
+                          "     AND nlevel(termhierarchy) = 3 "
+                          "     AND termhierarchy NOT IN "
+                          "         (SELECT damage_object_tid "
+                          "          FROM reference_data.norms_damage_target "
+                          "          GROUP BY damage_object_tid "
+                          "          HAVING count(*) = "
+                          "             (SELECT COUNT(termhierarchy) "
+                          "              FROM reference_data.terms "
+                          "              WHERE termhierarchy ~ '95.10.*' "
+                          "                 AND nlevel(termhierarchy) = 3));";
+    if (!query.exec(selectQuery)) {
+        qDebug() << "Unable to make select operation!" << query.lastError();
+    }
+
+    QMap<QString,QString> map;
+    while (query.next()) {
+        map.insert(query.value(0).toString(), query.value(1).toString());
+    }
+    return map;
+}
+
 
 QMap<QString,QString> Editor::getHitTargets() {
     QSqlQuery query;
