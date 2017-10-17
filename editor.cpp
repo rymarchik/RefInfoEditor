@@ -967,7 +967,7 @@ void Editor::slotDelete() {
         QString selectPattern = "SELECT termhierarchy "
                                 "FROM reference_data.terms "
                                 "WHERE termname = '%1' "
-                                "   AND termhierarchy ~ '90.20.*'";
+                                "   AND nlevel(termhierarchy) = 3";
         QString selectQuery = selectPattern.arg(classifierName);
         query.exec(selectQuery);
         query.next();
