@@ -34,6 +34,9 @@ Editor::Editor(QWidget *parent) :
     addAction->setEnabled(false);
     editAction->setEnabled(false);
     deleteAction->setEnabled(false);
+    searchAction->setEnabled(false);
+    uploadAction->setEnabled(false);
+    downloadAction->setEnabled(false);
 
     tools->addAction(addAction);
     tools->addAction(editAction);
